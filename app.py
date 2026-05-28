@@ -1,107 +1,116 @@
-
 import streamlit as st
 import pdfplumber
+import os
+import nltk
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
-st.set_page_config(page_title="AI Resume Analyzer")
+# Download required nltk data
 
-st.title("AI Resume Analyzer")
-st.write("Upload your resume PDF")
+nltk.download('punkt')
 
-uploaded_file = st.file_uploader("Upload Resume", type=["pdf"])
+# ---------------- FUNCTIONS ----------------
+
+def extract_text_from_pdf(file):
+    text =""
+with pdfplumber.open(file) as pdf:
+for page in pdf.pages:
+page_text = page.extract_text()
+if page_text:
+text += page_text
+return text
+
+def calculate_ats_score(resume_text, job_description):
+documents = [resume_text, job_description]
+
+```
+tfidf = TfidfVectorizer(stop_words='english')
+matrix = tfidf.fit_transform(documents)
+
+score = cosine_similarity(matrix[0:1], matrix[1:2])[0][0]
+
+return round(score * 100, 2)
+```
+
+def extract_skills(text):
+skills_list = [
+"python", "java", "sql", "machine learning", "deep learning",
+"nlp", "tensorflow", "pytorch", "opencv", "pandas", "numpy",
+"excel", "data analysis", "statistics"
+]
+
+```
+text = text.lower()
+found_skills = []
+
+for skill in skills_list:
+    if skill in text:
+        found_skills.append(skill)
+
+return found_skills
+```
+
+# ---------------- STREAMLIT UI ----------------
+
+st.set_page_config(page_title="AI Resume Analyzer", layout="wide")
+
+st.title("🤖 AI Resume Analyzer & ATS Checker")
+st.write("Upload your resume and compare it with a job description")
+
+# Create uploads folder
+
+if not os.path.exists("uploads"):
+os.makedirs("uploads")
+
+# Upload file
+
+uploaded_file = st.file_uploader("Upload Resume (PDF)", type=["pdf"])
+
+# Job description input
 
 job_description = st.text_area("Paste Job Description")
 
-skills_db = [
-    "Python",
-    "Machine Learning",
-    "Deep Learning",
-    "SQL",
-    "Java",
-    "JavaScript",
-    "React",
-    "Flask",
-    "TensorFlow",
-    "PyTorch",
-    "Scikit-learn",
-    "Pandas",
-    "NumPy",
-    "OpenCV",
-    "LangChain",
-    "NLP",
-    "Generative AI",
-    "Artificial Intelligence",
-    "Data Science",
-    "Git",
-    "GitHub",
-    "API",
-    "FastAPI",
-    "Streamlit",
-]
+resume_text = ""
 
-if uploaded_file:
+# ---------------- PROCESS RESUME ----------------
 
-    text = ""
+if uploaded_file is not None:
+file_path = os.path.join("uploads", uploaded_file.name)
 
-    with pdfplumber.open(uploaded_file) as pdf:
-        for page in pdf.pages:
-            extracted = page.extract_text()
+```
+# Save file
+with open(file_path, "wb") as f:
+    f.write(uploaded_file.getbuffer())
 
-            if extracted:
-                text += extracted
+st.success("Resume uploaded successfully!")
 
-    st.subheader("Resume Text")
-    st.write(text)
+# Extract text
+resume_text = extract_text_from_pdf(uploaded_file)
 
-    found_skills = []
+st.subheader("📄 Resume Text")
+st.write(resume_text)
+```
 
-    for skill in skills_db:
-        if skill.lower() in text.lower():
-            found_skills.append(skill)
+# ---------------- ANALYSIS ----------------
 
-    st.subheader("Detected Skills")
+if uploaded_file is not None and job_description:
 
-    if found_skills:
-        for skill in found_skills:
-            st.success(skill)
-    else:
-        st.warning("No skills detected")
+```
+st.subheader("📊 Analysis Result")
 
-    ats_score = len(found_skills) * 4
+# Skills
+skills = extract_skills(resume_text)
+st.write("**Detected Skills:**", skills)
 
-    if ats_score > 100:
-        ats_score = 100
+# ATS Score
+ats_score = calculate_ats_score(resume_text, job_description)
+st.write("**ATS Score:**", ats_score, "%")
 
-    st.subheader("ATS Score")
-
-    st.progress(ats_score / 100)
-
-    st.write(f"ATS Score: {ats_score}%")
-
-    if job_description:
-
-        text_list = [text, job_description]
-
-        vectorizer = TfidfVectorizer()
-
-        vectors = vectorizer.fit_transform(text_list)
-
-        similarity = cosine_similarity(vectors[0:1], vectors[1:2])
-
-        match_percentage = int(similarity[0][0] * 100)
-
-        st.subheader("Job Match Percentage")
-
-        st.progress(match_percentage / 100)
-
-        st.write(f"Match Percentage: {match_percentage}%")
-
-    st.subheader("Suggestions")
-
-    if ats_score < 50:
-        st.error("Add more technical skills and projects.")
-    elif ats_score < 80:
-        st.warning("Resume is good but can be improved.")
-    else:
-        st.success("Excellent Resume!")
+# Result message
+if ats_score >= 75:
+    st.success("Strong Match ✔ Good Resume for this Job")
+elif ats_score >= 50:
+    st.warning("Moderate Match ⚠ Improve your Resume")
+else:
+    st.error("Weak Match ❌ Needs Improvement")
+```
